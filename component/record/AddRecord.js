@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, TextInput, PaperProvider } from 'react-native-paper';
 import { Alert, View } from 'react-native';
-import { DatePickerInput, id } from 'react-native-paper-dates';
+import { DatePickerInput } from 'react-native-paper-dates';
 import { useRoute } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
 import { en, registerTranslation } from 'react-native-paper-dates';
@@ -11,13 +11,14 @@ registerTranslation('en', en);
 
 export default function AddRecord() {
     const route = useRoute();
-    const { db, updateList } = route.params;
+    const { db, categories, updateList } = route.params;
     const navigation = useNavigation();
 
 	const [brief, setBrief] = useState({
 		date: null,
         shop: "",
 	});
+    const [details, setDetails] = useState([]);
 
     const handleChange = (name, value) => {
 		setBrief({...brief, [name]: value});
@@ -29,11 +30,18 @@ export default function AddRecord() {
             Alert.alert('Error', 'Please fill in both fields.')
             return;
         }
+        if(details.length < 1){
+            Alert.alert('Error', 'At least one item in the record.')
+            return;
+        }
         try {
-          const id = Date.now();
-          await db.runAsync('INSERT INTO briefRecord VALUES (?, ?, ?)', id, date.toISOString(), shop);
-          await updateList();
-          navigation.navigate('Records', 'Record added.')
+            const id = Date.now();
+            await db.runAsync('INSERT INTO briefRecord VALUES (?, ?, ?)', id, date.toISOString().split('T')[0], shop);
+            for (const detail of details) {
+                await db.runAsync('INSERT INTO detailRecord VALUES (?, ?, ?, ?, ?, ?)', id, detail.item, detail.category, detail.amount, parseFloat(detail.price), detail.promotion);
+            }
+            await updateList();
+            navigation.navigate('Records', 'Record added.')
         } catch (error) {
           console.error('Could not add item', error);
         }
@@ -50,14 +58,21 @@ export default function AddRecord() {
                     inputMode="start"
                 /> 
                 <TextInput 
-                label='Shop' 
+                label='Provider' 
                 onChangeText={(value) => handleChange('shop', value)}
                 value={brief.shop}
                 /> 
             </View>
-            <View style={{flexDirection: 'row', justifyContent: 'space-around'}}>
-                <AddItem />
-                <Button icon='content-save' style={{width:'45%'}} onPress={handleSave} mode="contained" >Save</Button>
+            <View>
+                <Button 
+                    icon='content-save' 
+                    style={{width:'45%', alignSelf:'flex-end', margin:5 }} 
+                    onPress={handleSave} 
+                    mode="contained" 
+                >
+                    Save
+                </Button>
+                <AddItem setDetails={setDetails} details={details} categories={categories} />
             </View>
         </PaperProvider>
     );
